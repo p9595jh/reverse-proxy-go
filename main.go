@@ -25,13 +25,13 @@ func (ws *WS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// dialer for dialing to the destination
-	dialer, _, err := websocket.DefaultDialer.Dial(ws.dst, nil)
+	// dial for communicating to the destination
+	dial, _, err := websocket.DefaultDialer.Dial(ws.dst, nil)
 	if err != nil {
 		w.Write([]byte(err.Error()))
 		return
 	}
-	defer dialer.Close()
+	defer dial.Close()
 
 	for {
 		// this data is from the user
@@ -42,14 +42,14 @@ func (ws *WS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// writes the user's message to the destination
-		err = dialer.WriteMessage(messageType, data)
+		err = dial.WriteMessage(messageType, data)
 		if err != nil {
 			conn.WriteMessage(messageType, []byte(err.Error()))
 			return
 		}
 
 		// receives from the destination
-		_, dstReader, err := dialer.NextReader()
+		_, dstReader, err := dial.NextReader()
 		if err != nil {
 			conn.WriteMessage(messageType, []byte(err.Error()))
 			return
@@ -76,8 +76,9 @@ func main() {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	// url for proxying
-	dst := "http://127.0.0.1:8545"
-	u, err := url.Parse(dst)
+	httpDst := "http://127.0.0.1:8545"
+	wsDst := "ws://127.0.0.1:8546"
+	u, err := url.Parse(httpDst)
 	if err != nil {
 		logger.Fatal().Err(err).Send()
 	}
@@ -110,7 +111,7 @@ func main() {
 				ReadBufferSize:  1024,
 				WriteBufferSize: 1024,
 			},
-			dst: dst,
+			dst: wsDst,
 		}
 		http.Handle("/ws", ws)
 		if err := http.ListenAndServe(":3001", nil); err != nil {
